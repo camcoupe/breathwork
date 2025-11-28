@@ -314,15 +314,17 @@
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
         }
 
         function playChime() {
             initAudio();
+            // Resume context if suspended (required for autoplay policies)
             if (audioContext.state === 'suspended') {
-                audioContext.resume().then(playChimeSound);
+                audioContext.resume().then(() => {
+                    playChimeSound();
+                }).catch(err => {
+                    console.error('Error resuming audio context:', err);
+                });
             } else {
                 playChimeSound();
             }
@@ -465,7 +467,18 @@
             });
         });
 
-        document.getElementById('startButton').addEventListener('click', startTimer);
+        // Initialize audio context on first user interaction (required for autoplay policies)
+        function unlockAudio() {
+            initAudio();
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        document.getElementById('startButton').addEventListener('click', (e) => {
+            unlockAudio();
+            startTimer();
+        });
         document.getElementById('addBtn').addEventListener('click', addSegment);
         document.getElementById('removeBtn').addEventListener('click', removeSegment);
         document.getElementById('stopBtn').addEventListener('click', stopTimer);
