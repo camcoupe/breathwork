@@ -296,10 +296,10 @@
     <button class="audio-toggle" id="audioToggle" title="Toggle audio">
         <img id="audioIcon" src="Images/svg/Dash:Off.svg" alt="Audio off">
     </button>
-    <audio id="backgroundAudio1" preload="auto">
+    <audio id="backgroundAudio1" preload="auto" crossorigin="anonymous">
         <source src="Audio/01 - Natural Tranquility of a Windy Day_01(5 Minute).aac" type="audio/aac">
     </audio>
-    <audio id="backgroundAudio2" preload="auto">
+    <audio id="backgroundAudio2" preload="auto" crossorigin="anonymous">
         <source src="Audio/01 - Natural Tranquility of a Windy Day_01(5 Minute).aac" type="audio/aac">
     </audio>
 
@@ -583,7 +583,7 @@
         let loopCheckInterval = null;
         let currentAudio = audio1;
         let nextAudio = audio2;
-        let crossfadeDuration = 3000; // 3 seconds for crossfade
+        let crossfadeDuration = 10; // 10 seconds for crossfade (in seconds, not milliseconds)
         let crossfadeInProgress = false;
 
         // Wait for audio metadata to load
@@ -597,6 +597,10 @@
                 else audio2.addEventListener('loadedmetadata', resolve, { once: true });
             })
         ]).then(() => {
+            // Log detected duration for debugging
+            console.log('Audio 1 duration:', audio1.duration, 'seconds');
+            console.log('Audio 2 duration:', audio2.duration, 'seconds');
+            console.log('Expected: ~300 seconds (5 minutes)');
             // Set up ended event listeners as backup
             audio1.addEventListener('ended', handleAudioEnded);
             audio2.addEventListener('ended', handleAudioEnded);
@@ -616,58 +620,87 @@
             if (crossfadeInProgress) return; // Prevent multiple crossfades
             crossfadeInProgress = true;
 
-            // Swap audio elements
-            const temp = currentAudio;
-            currentAudio = nextAudio;
-            nextAudio = temp;
-
-            // Reset and start next audio at beginning
-            nextAudio.currentTime = 0;
-            nextAudio.volume = 0;
-            nextAudio.play().catch(err => {
-                console.error('Error playing audio:', err);
-                crossfadeInProgress = false;
-            });
-
-            // Fade out current, fade in next
-            const fadeSteps = 60;
-            const stepDuration = crossfadeDuration / fadeSteps;
-            let currentStep = 0;
-
-            // Clear any existing crossfade interval
-            if (crossfadeInterval) {
-                clearInterval(crossfadeInterval);
+            // Prepare next audio BEFORE swapping - reset and start playing
+            const nextAudioToUse = (currentAudio === audio1) ? audio2 : audio1;
+            nextAudioToUse.currentTime = 0;
+            nextAudioToUse.volume = 0;
+            
+            // Start next audio playing immediately (silently)
+            const playPromise = nextAudioToUse.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.error('Error starting next audio:', err);
+                    crossfadeInProgress = false;
+                    return;
+                });
             }
 
-            crossfadeInterval = setInterval(() => {
-                currentStep++;
-                const progress = currentStep / fadeSteps;
+            // Wait to ensure next audio has started, then begin crossfade
+            // Use requestAnimationFrame for better timing
+            requestAnimationFrame(() => {
+                // Store references to the actual audio elements we're working with
+                const audioToFadeOut = currentAudio; // The one currently playing
+                const audioToFadeIn = nextAudioToUse; // The one we just started
                 
-                // Fade out current audio
-                currentAudio.volume = Math.max(0.25 * (1 - progress), 0); // Max volume 25%
-                
-                // Fade in next audio
-                nextAudio.volume = Math.min(0.25 * progress, 0.25); // Max volume 25%
+                // Now swap references for next loop
+                const temp = currentAudio;
+                currentAudio = nextAudio;
+                nextAudio = temp;
 
-                if (currentStep >= fadeSteps) {
-                    // Stop current audio when crossfade complete
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
+                // Fade out current, fade in next - BOTH MUST BE PLAYING SIMULTANEOUSLY
+                const fadeSteps = 60;
+                const stepDuration = (crossfadeDuration * 1000) / fadeSteps;
+                let currentStep = 0;
+
+                // Clear any existing crossfade interval
+                if (crossfadeInterval) {
                     clearInterval(crossfadeInterval);
-                    crossfadeInterval = null;
-                    crossfadeInProgress = false;
                 }
-            }, stepDuration);
+
+                crossfadeInterval = setInterval(() => {
+                    currentStep++;
+                    const progress = currentStep / fadeSteps;
+                    
+                    // Fade out current audio (from 0.25 to 0) - still playing
+                    audioToFadeOut.volume = Math.max(0.25 * (1 - progress), 0);
+                    
+                    // Fade in next audio (from 0 to 0.25) - BOTH PLAYING AT SAME TIME
+                    audioToFadeIn.volume = Math.min(0.25 * progress, 0.25);
+
+                    if (currentStep >= fadeSteps) {
+                        // Stop current audio when crossfade complete
+                        audioToFadeOut.pause();
+                        audioToFadeOut.currentTime = 0;
+                        clearInterval(crossfadeInterval);
+                        crossfadeInterval = null;
+                        crossfadeInProgress = false;
+                    }
+                }, stepDuration);
+            });
         }
 
         // Check for loop point and trigger crossfade
         function checkLoopPoint() {
-            if (!isAudioOn || !currentAudio.duration || isNaN(currentAudio.duration) || crossfadeInProgress) return;
+            if (!isAudioOn || !currentAudio.duration || isNaN(currentAudio.duration) || crossfadeInProgress) {
+                if (!currentAudio.duration) {
+                    console.warn('Audio duration not available yet. ReadyState:', currentAudio.readyState);
+                }
+                return;
+            }
 
             const timeUntilEnd = currentAudio.duration - currentAudio.currentTime;
             
+            // Log every 10 seconds for more frequent updates
+            if (Math.floor(currentAudio.currentTime) % 10 === 0 && currentAudio.currentTime > 0 && Math.floor(currentAudio.currentTime) !== Math.floor((currentAudio.currentTime - 0.1))) {
+                console.log('⏱️ Time:', currentAudio.currentTime.toFixed(1) + 's /', currentAudio.duration.toFixed(1) + 's | Time until end:', timeUntilEnd.toFixed(1) + 's');
+            }
+            
             // Start crossfade when within crossfade duration of the end
             if (timeUntilEnd <= crossfadeDuration && timeUntilEnd > 0.1) {
+                console.log('🔄 CROSSFADE TRIGGERED!');
+                console.log('   Current time:', currentAudio.currentTime.toFixed(1) + 's');
+                console.log('   Total duration:', currentAudio.duration.toFixed(1) + 's');
+                console.log('   Time until end:', timeUntilEnd.toFixed(1) + 's');
                 startCrossfade();
             }
         }
@@ -675,7 +708,19 @@
         // Fade in function for initial start
         function fadeIn() {
             currentAudio.volume = 0;
-            currentAudio.play().catch(err => {
+            
+            // Log audio info before playing
+            console.log('=== AUDIO DEBUG INFO ===');
+            console.log('Current audio element:', currentAudio.id);
+            console.log('Audio source:', currentAudio.querySelector('source').src);
+            console.log('Audio duration (before play):', currentAudio.duration);
+            console.log('Audio readyState:', currentAudio.readyState);
+            
+            currentAudio.play().then(() => {
+                console.log('Audio started playing');
+                console.log('Audio duration (after play):', currentAudio.duration);
+                console.log('Expected duration: ~300 seconds (5 minutes)');
+            }).catch(err => {
                 console.error('Error playing audio:', err);
             });
             
