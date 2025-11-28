@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breathwork Timer</title>
+    <style>
+        @font-face {
+            font-family: 'NeueHaasDisplayRoman';
+            src: url('Type/Neue Haas Grotesk/NeueHaasDisplayRoman.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            font-family: 'NeueHaasDisplayRoman', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .background-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('Images/png/Background-Medium.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -1;
+            transition: filter 0.2s ease, transform 0.2s ease;
+            transform-origin: center center;
+        }
+
+        .hue-control {
+            position: fixed;
+            top: 36px;
+            right: 36px;
+            width: 60px;
+            height: 60px;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .hue-wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: transparent;
+            position: relative;
+            border: 1px solid #000;
+        }
+
+        .hue-indicator {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            cursor: grab;
+        }
+
+        .hue-indicator:active {
+            cursor: grabbing;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            min-height: 100vh;
+            justify-content: center;
+        }
+
+        .start-button {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 14px 40px;
+            border-radius: 999px;
+            font-size: 16px;
+            font-weight: normal;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: absolute;
+            bottom: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .start-button:hover {
+            transform: translateX(-50%) scale(1.025);
+        }
+
+        .audio-toggle {
+            position: fixed;
+            bottom: 36px;
+            left: 36px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #000;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            z-index: 10;
+            transition: transform 0.2s ease;
+        }
+
+        .audio-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .audio-toggle img {
+            width: 12px;
+            height: 12px;
+            display: block;
+        }
+
+        .audio-toggle.rotating img {
+            animation: rotateSlow 8s linear infinite;
+        }
+
+        @keyframes rotateSlow {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+        }
+
+        .time-segment {
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 16px;
+            font-weight: normal;
+            color: #000;
+            cursor: text;
+            width: 60px;
+            text-align: center;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        .time-segment:focus {
+            outline: none;
+        }
+
+        .toolbar-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toolbar-button {
+            width: 16px;
+            height: 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .toolbar-button img {
+            width: 100%;
+            height: 100%;
+            filter: brightness(0);
+        }
+
+        .toolbar-button:hover {
+            transform: scale(1.1);
+        }
+
+        .timer-display {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer-display.active {
+            display: flex;
+        }
+
+        .time {
+            font-size: 84px;
+            font-weight: normal;
+            color: #000;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .timer-btn {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 14px 40px;
+            border-radius: 999px;
+            font-size: 16px;
+            font-weight: normal;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: absolute;
+            bottom: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .timer-btn:hover {
+            transform: translateX(-50%) scale(1.025);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-wrapper" id="backgroundWrapper"></div>
+    <div class="hue-control" id="hueControl">
+        <div class="hue-wheel" id="hueWheel">
+            <div class="hue-indicator" id="hueIndicator"></div>
+        </div>
+    </div>
+    <div class="container" id="mainContainer">
+        <button class="start-button" id="startButton">Start</button>
+        <div class="toolbar-wrapper">
+            <div class="toolbar" id="toolbar">
+                <input type="text" class="time-segment" value="1 Min" data-minutes="1">
+                <input type="text" class="time-segment" value="2 Min" data-minutes="2">
+                <input type="text" class="time-segment" value="3 Min" data-minutes="3">
+            </div>
+            <button class="toolbar-button" id="addBtn">
+                <img src="Images/svg/Plus.svg" alt="Add">
+            </button>
+            <button class="toolbar-button" id="removeBtn">
+                <img src="Images/svg/Minus.svg" alt="Remove">
+            </button>
+        </div>
+    </div>
+
+    <div class="timer-display" id="timerDisplay">
+        <div class="time" id="timeDisplay">00:00</div>
+        <button class="timer-btn" id="stopBtn">Stop</button>
+    </div>
+
+    <button class="audio-toggle" id="audioToggle" title="Toggle audio">
+        <img id="audioIcon" src="Images/svg/Dash:Off.svg" alt="Audio off">
+    </button>
+    <audio id="backgroundAudio1" preload="auto">
+        <source src="Audio/01 - Natural Tranquility of a Windy Day_01(5 Minute).aac" type="audio/aac">
+    </audio>
+    <audio id="backgroundAudio2" preload="auto">
+        <source src="Audio/01 - Natural Tranquility of a Windy Day_01(5 Minute).aac" type="audio/aac">
+    </audio>
+
+    <script>
+        let intervals = [];
+        let currentSection = 0;
+        let timeRemaining = 0;
+        let timerInterval = null;
+        let audioContext = null;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        function playChime() {
+            initAudio();
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().then(playChimeSound);
+            } else {
+                playChimeSound();
+            }
+        }
+
+        function playChimeSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 432;
+            oscillator.type = 'sine';
+            
+            const duration = 5; // 5 second duration
+            
+            // Bell-like decay: start at 30% volume and fade to silence
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function parseTimeSegment(value) {
+            const match = value.match(/(\d+(?:\.\d+)?)\s*(?:min|m|minutes?)?/i);
+            if (match) {
+                return parseFloat(match[1]);
+            }
+            return 3; // default
+        }
+
+        function formatTimeSegment(minutes) {
+            return `${minutes} Min`;
+        }
+
+        function getIntervals() {
+            const segments = document.querySelectorAll('.time-segment');
+            return Array.from(segments).map(segment => {
+                const minutes = parseTimeSegment(segment.value);
+                return minutes * 60; // Convert to seconds
+            }).filter(val => val > 0);
+        }
+
+        function updateTimeDisplay() {
+            document.getElementById('timeDisplay').textContent = formatTime(timeRemaining);
+        }
+
+        function startTimer() {
+            intervals = getIntervals();
+            
+            if (intervals.length === 0) {
+                alert('Please add at least one timer interval');
+                return;
+            }
+            
+            currentSection = 0;
+            timeRemaining = intervals[currentSection];
+            
+            document.getElementById('timerDisplay').classList.add('active');
+            document.getElementById('mainContainer').style.display = 'none';
+            
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimeDisplay();
+                
+                if (timeRemaining <= 0) {
+                    playChime();
+                    currentSection++;
+                    
+                    if (currentSection < intervals.length) {
+                        timeRemaining = intervals[currentSection];
+                    } else {
+                        clearInterval(timerInterval);
+                        stopTimer();
+                    }
+                }
+            }, 1000);
+            
+            updateTimeDisplay();
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            currentSection = 0;
+            timeRemaining = 0;
+            document.getElementById('timerDisplay').classList.remove('active');
+            document.getElementById('mainContainer').style.display = 'flex';
+        }
+
+        function addSegment() {
+            const toolbar = document.getElementById('toolbar');
+            const newSegment = document.createElement('input');
+            newSegment.type = 'text';
+            newSegment.className = 'time-segment';
+            newSegment.value = '1 Min';
+            newSegment.setAttribute('data-minutes', '1');
+            newSegment.addEventListener('blur', handleSegmentBlur);
+            newSegment.addEventListener('keypress', handleSegmentKeypress);
+            newSegment.addEventListener('click', function() {
+                setTimeout(() => this.select(), 0);
+            });
+            toolbar.appendChild(newSegment);
+        }
+
+        function removeSegment() {
+            const segments = document.querySelectorAll('.time-segment');
+            if (segments.length > 1) {
+                segments[segments.length - 1].remove();
+            } else {
+                alert('You need at least one timer segment');
+            }
+        }
+
+        function handleSegmentBlur(e) {
+            const minutes = parseTimeSegment(e.target.value);
+            e.target.value = formatTimeSegment(minutes);
+            e.target.setAttribute('data-minutes', minutes);
+        }
+
+        function handleSegmentKeypress(e) {
+            if (e.key === 'Enter') {
+                e.target.blur();
+            }
+        }
+
+        // Event listeners
+        document.querySelectorAll('.time-segment').forEach(segment => {
+            segment.addEventListener('blur', handleSegmentBlur);
+            segment.addEventListener('keypress', handleSegmentKeypress);
+            segment.addEventListener('click', function() {
+                setTimeout(() => this.select(), 0);
+            });
+        });
+
+        document.getElementById('startButton').addEventListener('click', startTimer);
+        document.getElementById('addBtn').addEventListener('click', addSegment);
+        document.getElementById('removeBtn').addEventListener('click', removeSegment);
+        document.getElementById('stopBtn').addEventListener('click', stopTimer);
+
+        // Radial hue menu control
+        const hueControl = document.getElementById('hueControl');
+        const hueWheel = document.getElementById('hueWheel');
+        const hueIndicator = document.getElementById('hueIndicator');
+        const backgroundWrapper = document.getElementById('backgroundWrapper');
+        let isDragging = false;
+
+        function updateHueFromPosition(clientX, clientY) {
+            const rect = hueControl.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const deltaX = clientX - centerX;
+            const deltaY = clientY - centerY;
+            
+            // Calculate distance from center
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Calculate maximum radius (edge of circle)
+            const dotSize = 8;
+            const borderWidth = 1;
+            const padding = 4;
+            const maxRadius = (rect.width / 2) - (borderWidth + padding + dotSize / 2);
+            
+            // Clamp distance to stay within circle bounds
+            const clampedDistance = Math.min(distance, maxRadius);
+            
+            // Calculate angle and convert to hue degrees (0-360) where 0 = top
+            let angleRad = Math.atan2(deltaY, deltaX);
+            let hueDeg = ((((angleRad + Math.PI/2) * 180/Math.PI) % 360) + 360) % 360;
+            
+            // Calculate blur based on distance from center
+            const maxBlur = 20;
+            const blurAmount = maxBlur * (1 - (clampedDistance / maxRadius));
+            
+            // Calculate scale/zoom based on distance from center
+            const maxScale = 2;
+            const scaleAmount = 1 + (maxScale - 1) * (1 - (clampedDistance / maxRadius));
+            
+            // Apply filters and transform
+            backgroundWrapper.style.filter = `hue-rotate(${hueDeg}deg) blur(${blurAmount}px)`;
+            backgroundWrapper.style.transform = `scale(${scaleAmount})`;
+            
+            // Update indicator position
+            const indicatorX = Math.cos(angleRad) * clampedDistance;
+            const indicatorY = Math.sin(angleRad) * clampedDistance;
+            hueIndicator.style.transform = `translate(calc(-50% + ${indicatorX}px), calc(-50% + ${indicatorY}px))`;
+        }
+
+        // Initialize indicator position
+        function initializeHueIndicator() {
+            const rect = hueControl.getBoundingClientRect();
+            const dotSize = 8;
+            const borderWidth = 1;
+            const padding = 4;
+            const maxRadius = (rect.width / 2) - (borderWidth + padding + dotSize / 2);
+            // Start at top edge with no blur and no zoom
+            hueIndicator.style.transform = `translate(calc(-50% + ${0}px), calc(-50% + ${-maxRadius}px))`;
+            // Initialize background to no blur and scale 1
+            backgroundWrapper.style.filter = `hue-rotate(0deg) blur(0px)`;
+            backgroundWrapper.style.transform = `scale(1)`;
+        }
+
+        hueControl.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // Prevent text selection
+            isDragging = true;
+            updateHueFromPosition(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                e.preventDefault(); // Prevent text selection while dragging
+                updateHueFromPosition(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Also allow click (not just drag)
+        hueControl.addEventListener('click', (e) => {
+            if (!isDragging) {
+                updateHueFromPosition(e.clientX, e.clientY);
+            }
+        });
+
+        // Initialize on page load
+        initializeHueIndicator();
+
+        // Audio toggle functionality with crossfade looping
+        const audioToggle = document.getElementById('audioToggle');
+        const audioIcon = document.getElementById('audioIcon');
+        const audio1 = document.getElementById('backgroundAudio1');
+        const audio2 = document.getElementById('backgroundAudio2');
+        let isAudioOn = false;
+        let fadeInterval = null;
+        let loopCheckInterval = null;
+        let currentAudio = audio1;
+        let nextAudio = audio2;
+        let crossfadeDuration = 3000; // 3 seconds for crossfade
+        let crossfadeInProgress = false;
+
+        // Wait for audio metadata to load
+        Promise.all([
+            new Promise(resolve => {
+                if (audio1.readyState >= 2) resolve();
+                else audio1.addEventListener('loadedmetadata', resolve, { once: true });
+            }),
+            new Promise(resolve => {
+                if (audio2.readyState >= 2) resolve();
+                else audio2.addEventListener('loadedmetadata', resolve, { once: true });
+            })
+        ]).then(() => {
+            // Set up ended event listeners as backup
+            audio1.addEventListener('ended', handleAudioEnded);
+            audio2.addEventListener('ended', handleAudioEnded);
+        });
+
+        function handleAudioEnded(e) {
+            // If audio ended and we're still playing, trigger crossfade
+            if (isAudioOn && e.target === currentAudio && !crossfadeInProgress) {
+                startCrossfade();
+            }
+        }
+
+        let crossfadeInterval = null;
+
+        // Crossfade function for seamless looping
+        function startCrossfade() {
+            if (crossfadeInProgress) return; // Prevent multiple crossfades
+            crossfadeInProgress = true;
+
+            // Swap audio elements
+            const temp = currentAudio;
+            currentAudio = nextAudio;
+            nextAudio = temp;
+
+            // Reset and start next audio at beginning
+            nextAudio.currentTime = 0;
+            nextAudio.volume = 0;
+            nextAudio.play().catch(err => {
+                console.error('Error playing audio:', err);
+                crossfadeInProgress = false;
+            });
+
+            // Fade out current, fade in next
+            const fadeSteps = 60;
+            const stepDuration = crossfadeDuration / fadeSteps;
+            let currentStep = 0;
+
+            // Clear any existing crossfade interval
+            if (crossfadeInterval) {
+                clearInterval(crossfadeInterval);
+            }
+
+            crossfadeInterval = setInterval(() => {
+                currentStep++;
+                const progress = currentStep / fadeSteps;
+                
+                // Fade out current audio
+                currentAudio.volume = Math.max(0.25 * (1 - progress), 0); // Max volume 25%
+                
+                // Fade in next audio
+                nextAudio.volume = Math.min(0.25 * progress, 0.25); // Max volume 25%
+
+                if (currentStep >= fadeSteps) {
+                    // Stop current audio when crossfade complete
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                    clearInterval(crossfadeInterval);
+                    crossfadeInterval = null;
+                    crossfadeInProgress = false;
+                }
+            }, stepDuration);
+        }
+
+        // Check for loop point and trigger crossfade
+        function checkLoopPoint() {
+            if (!isAudioOn || !currentAudio.duration || isNaN(currentAudio.duration) || crossfadeInProgress) return;
+
+            const timeUntilEnd = currentAudio.duration - currentAudio.currentTime;
+            
+            // Start crossfade when within crossfade duration of the end
+            if (timeUntilEnd <= crossfadeDuration && timeUntilEnd > 0.1) {
+                startCrossfade();
+            }
+        }
+
+        // Fade in function for initial start
+        function fadeIn() {
+            currentAudio.volume = 0;
+            currentAudio.play().catch(err => {
+                console.error('Error playing audio:', err);
+            });
+            
+            const fadeDuration = 2000;
+            const fadeSteps = 50;
+            const volumeStep = 0.25 / fadeSteps; // Max volume 25%
+            const stepDuration = fadeDuration / fadeSteps;
+            let currentStep = 0;
+
+            fadeInterval = setInterval(() => {
+                currentStep++;
+                currentAudio.volume = Math.min(volumeStep * currentStep, 0.25);
+                
+                if (currentStep >= fadeSteps) {
+                    clearInterval(fadeInterval);
+                    fadeInterval = null;
+                }
+            }, stepDuration);
+
+            loopCheckInterval = setInterval(checkLoopPoint, 50);
+        }
+
+        // Fade out function
+        function fadeOut() {
+            // Stop loop checking
+            if (loopCheckInterval) {
+                clearInterval(loopCheckInterval);
+                loopCheckInterval = null;
+            }
+
+            // Stop any crossfade in progress
+            if (crossfadeInterval) {
+                clearInterval(crossfadeInterval);
+                crossfadeInterval = null;
+            }
+            crossfadeInProgress = false;
+
+            // Determine which audio elements are actually playing
+            const currentIsPlaying = !currentAudio.paused && currentAudio.volume > 0;
+            const nextIsPlaying = !nextAudio.paused && nextAudio.volume > 0;
+
+            // Capture initial volumes only for playing elements
+            const initialVolume1 = currentIsPlaying ? currentAudio.volume : 0;
+            const initialVolume2 = nextIsPlaying ? nextAudio.volume : 0;
+
+            // If neither is playing, just stop everything
+            if (!currentIsPlaying && !nextIsPlaying) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio.volume = 0;
+                nextAudio.pause();
+                nextAudio.currentTime = 0;
+                nextAudio.volume = 0;
+                return;
+            }
+
+            const fadeDuration = 2000;
+            const fadeSteps = 60;
+            const stepDuration = fadeDuration / fadeSteps;
+            let currentStep = 0;
+
+            fadeInterval = setInterval(() => {
+                currentStep++;
+                const progress = currentStep / fadeSteps;
+                
+                // Only fade elements that were actually playing
+                if (currentIsPlaying) {
+                    currentAudio.volume = Math.max(initialVolume1 * (1 - progress), 0);
+                }
+                if (nextIsPlaying) {
+                    nextAudio.volume = Math.max(initialVolume2 * (1 - progress), 0);
+                }
+                
+                if (currentStep >= fadeSteps || ((!currentIsPlaying || currentAudio.volume <= 0) && (!nextIsPlaying || nextAudio.volume <= 0))) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                    currentAudio.volume = 0;
+                    nextAudio.pause();
+                    nextAudio.currentTime = 0;
+                    nextAudio.volume = 0;
+                    clearInterval(fadeInterval);
+                    fadeInterval = null;
+                }
+            }, stepDuration);
+        }
+
+        audioToggle.addEventListener('click', () => {
+            // Clear any existing fade interval
+            if (fadeInterval) {
+                clearInterval(fadeInterval);
+                fadeInterval = null;
+            }
+
+            isAudioOn = !isAudioOn;
+            if (isAudioOn) {
+                audioIcon.src = 'Images/svg/Dot:On.svg?v=' + Date.now();
+                audioToggle.classList.add('rotating');
+                fadeIn();
+            } else {
+                audioIcon.src = 'Images/svg/Dash:Off.svg';
+                audioToggle.classList.remove('rotating');
+                fadeOut();
+            }
+        });
+
+    </script>
+</body>
+</html>
