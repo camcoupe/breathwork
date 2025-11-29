@@ -322,6 +322,19 @@
                 initAudio();
             }
             
+            // Always resume context first - browsers on HTTPS can suspend it
+            const ensureContextReady = () => {
+                return new Promise((resolve) => {
+                    if (audioContext.state === 'running') {
+                        resolve();
+                    } else if (audioContext.state === 'suspended') {
+                        audioContext.resume().then(resolve).catch(() => resolve());
+                    } else {
+                        resolve();
+                    }
+                });
+            };
+            
             // Always try to resume if suspended (required for autoplay policies on HTTPS)
             const playSound = () => {
                 // Double-check context is ready
@@ -353,23 +366,14 @@
                 }
             };
             
-            // Resume context if suspended, then play
-            if (audioContext.state === 'suspended') {
-                audioContext.resume().then(() => {
-                    // Verify it's actually running
-                    if (audioContext.state === 'running') {
-                        playSound();
-                    } else {
-                        console.error('Audio context not running after resume');
-                    }
-                }).catch(err => {
-                    console.error('Error resuming audio context:', err);
-                });
-            } else if (audioContext.state === 'running') {
-                playSound();
-            } else {
-                console.error('Audio context in unexpected state:', audioContext.state);
-            }
+            // Always ensure context is ready, then play
+            ensureContextReady().then(() => {
+                if (audioContext.state === 'running') {
+                    playSound();
+                } else {
+                    console.error('Audio context not running after resume attempt, state:', audioContext.state);
+                }
+            });
         }
 
         function formatTime(seconds) {
@@ -507,13 +511,20 @@
             
             // Create a test sound to ensure context is fully unlocked (silent, just to activate)
             try {
-                const testOsc = audioContext.createOscillator();
-                const testGain = audioContext.createGain();
-                testGain.gain.value = 0; // Silent
-                testOsc.connect(testGain);
-                testGain.connect(audioContext.destination);
-                testOsc.start();
-                testOsc.stop(audioContext.currentTime + 0.001);
+                if (audioContext && audioContext.state !== 'closed') {
+                    const testOsc = audioContext.createOscillator();
+                    const testGain = audioContext.createGain();
+                    testGain.gain.value = 0; // Silent
+                    testOsc.connect(testGain);
+                    testGain.connect(audioContext.destination);
+                    testOsc.start();
+                    testOsc.stop(audioContext.currentTime + 0.001);
+                    
+                    // Ensure context stays running
+                    if (audioContext.state === 'suspended') {
+                        await audioContext.resume();
+                    }
+                }
             } catch (err) {
                 console.error('Error creating test sound:', err);
             }
