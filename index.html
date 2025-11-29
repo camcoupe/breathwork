@@ -317,25 +317,18 @@
         }
 
         function playChime() {
-            console.log('🔔 playChime called');
-            
             // Ensure audio context exists
             if (!audioContext) {
-                console.log('Creating new audio context');
                 initAudio();
             }
-            
-            console.log('Audio context state:', audioContext.state);
             
             // Always try to resume if suspended (required for autoplay policies on HTTPS)
             const playSound = () => {
                 // Double-check context is ready
                 if (!audioContext || audioContext.state === 'closed') {
-                    console.error('❌ Audio context not available or closed');
+                    console.error('Audio context not available or closed');
                     return;
                 }
-                
-                console.log('Playing chime sound, context state:', audioContext.state);
                 
                 try {
                     const oscillator = audioContext.createOscillator();
@@ -355,31 +348,27 @@
                     
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + duration);
-                    
-                    console.log('✅ Chime started successfully');
                 } catch (err) {
-                    console.error('❌ Error playing chime:', err);
+                    console.error('Error playing chime:', err);
                 }
             };
             
             // Resume context if suspended, then play
             if (audioContext.state === 'suspended') {
-                console.log('Audio context suspended, resuming...');
                 audioContext.resume().then(() => {
-                    console.log('Audio context resumed, state:', audioContext.state);
                     // Verify it's actually running
                     if (audioContext.state === 'running') {
                         playSound();
                     } else {
-                        console.error('❌ Audio context not running after resume, state:', audioContext.state);
+                        console.error('Audio context not running after resume');
                     }
                 }).catch(err => {
-                    console.error('❌ Error resuming audio context:', err);
+                    console.error('Error resuming audio context:', err);
                 });
             } else if (audioContext.state === 'running') {
                 playSound();
             } else {
-                console.error('❌ Audio context in unexpected state:', audioContext.state);
+                console.error('Audio context in unexpected state:', audioContext.state);
             }
         }
 
@@ -650,10 +639,6 @@
                 else audio2.addEventListener('loadedmetadata', resolve, { once: true });
             })
         ]).then(() => {
-            // Log detected duration for debugging
-            console.log('Audio 1 duration:', audio1.duration, 'seconds');
-            console.log('Audio 2 duration:', audio2.duration, 'seconds');
-            console.log('Expected: ~300 seconds (5 minutes)');
             // Set up ended event listeners as backup
             audio1.addEventListener('ended', handleAudioEnded);
             audio2.addEventListener('ended', handleAudioEnded);
@@ -735,25 +720,13 @@
         // Check for loop point and trigger crossfade
         function checkLoopPoint() {
             if (!isAudioOn || !currentAudio.duration || isNaN(currentAudio.duration) || crossfadeInProgress) {
-                if (!currentAudio.duration) {
-                    console.warn('Audio duration not available yet. ReadyState:', currentAudio.readyState);
-                }
                 return;
             }
 
             const timeUntilEnd = currentAudio.duration - currentAudio.currentTime;
             
-            // Log every 10 seconds for more frequent updates
-            if (Math.floor(currentAudio.currentTime) % 10 === 0 && currentAudio.currentTime > 0 && Math.floor(currentAudio.currentTime) !== Math.floor((currentAudio.currentTime - 0.1))) {
-                console.log('⏱️ Time:', currentAudio.currentTime.toFixed(1) + 's /', currentAudio.duration.toFixed(1) + 's | Time until end:', timeUntilEnd.toFixed(1) + 's');
-            }
-            
             // Start crossfade when within crossfade duration of the end
             if (timeUntilEnd <= crossfadeDuration && timeUntilEnd > 0.1) {
-                console.log('🔄 CROSSFADE TRIGGERED!');
-                console.log('   Current time:', currentAudio.currentTime.toFixed(1) + 's');
-                console.log('   Total duration:', currentAudio.duration.toFixed(1) + 's');
-                console.log('   Time until end:', timeUntilEnd.toFixed(1) + 's');
                 startCrossfade();
             }
         }
@@ -761,19 +734,7 @@
         // Fade in function for initial start
         function fadeIn() {
             currentAudio.volume = 0;
-            
-            // Log audio info before playing
-            console.log('=== AUDIO DEBUG INFO ===');
-            console.log('Current audio element:', currentAudio.id);
-            console.log('Audio source:', currentAudio.querySelector('source').src);
-            console.log('Audio duration (before play):', currentAudio.duration);
-            console.log('Audio readyState:', currentAudio.readyState);
-            
-            currentAudio.play().then(() => {
-                console.log('Audio started playing');
-                console.log('Audio duration (after play):', currentAudio.duration);
-                console.log('Expected duration: ~300 seconds (5 minutes)');
-            }).catch(err => {
+            currentAudio.play().catch(err => {
                 console.error('Error playing audio:', err);
             });
             
