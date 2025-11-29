@@ -317,37 +317,50 @@
         }
 
         function playChime() {
+            // Ensure audio context exists
             initAudio();
-            // Resume context if suspended (required for autoplay policies)
+            
+            // Always try to resume if suspended (required for autoplay policies)
+            const playSound = () => {
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 432;
+                    oscillator.type = 'sine';
+                    
+                    const duration = 5; // 5 second duration
+                    
+                    // Bell-like decay: start at 30% volume and fade to silence
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + duration);
+                } catch (err) {
+                    console.error('Error playing chime:', err);
+                }
+            };
+            
+            // Resume context if suspended, then play
             if (audioContext.state === 'suspended') {
                 audioContext.resume().then(() => {
-                    playChimeSound();
+                    playSound();
                 }).catch(err => {
                     console.error('Error resuming audio context:', err);
+                    // Try to play anyway
+                    try {
+                        playSound();
+                    } catch (e) {
+                        console.error('Failed to play chime:', e);
+                    }
                 });
             } else {
-                playChimeSound();
+                playSound();
             }
-        }
-
-        function playChimeSound() {
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 432;
-            oscillator.type = 'sine';
-            
-            const duration = 5; // 5 second duration
-            
-            // Bell-like decay: start at 30% volume and fade to silence
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
         }
 
         function formatTime(seconds) {
@@ -470,14 +483,21 @@
         // Initialize audio context on first user interaction (required for autoplay policies)
         function unlockAudio() {
             initAudio();
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+            // Resume context if suspended - this is critical for autoplay policies
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(err => {
+                    console.error('Error unlocking audio context:', err);
+                });
             }
         }
 
         document.getElementById('startButton').addEventListener('click', (e) => {
+            // Unlock audio context FIRST, then start timer
             unlockAudio();
-            startTimer();
+            // Small delay to ensure context is ready
+            setTimeout(() => {
+                startTimer();
+            }, 50);
         });
         document.getElementById('addBtn').addEventListener('click', addSegment);
         document.getElementById('removeBtn').addEventListener('click', removeSegment);
