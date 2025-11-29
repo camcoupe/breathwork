@@ -318,10 +318,18 @@
 
         function playChime() {
             // Ensure audio context exists
-            initAudio();
+            if (!audioContext) {
+                initAudio();
+            }
             
-            // Always try to resume if suspended (required for autoplay policies)
+            // Always try to resume if suspended (required for autoplay policies on HTTPS)
             const playSound = () => {
+                // Double-check context is ready
+                if (!audioContext || audioContext.state === 'closed') {
+                    console.error('Audio context not available');
+                    return;
+                }
+                
                 try {
                     const oscillator = audioContext.createOscillator();
                     const gainNode = audioContext.createGain();
@@ -348,18 +356,19 @@
             // Resume context if suspended, then play
             if (audioContext.state === 'suspended') {
                 audioContext.resume().then(() => {
-                    playSound();
+                    // Verify it's actually running
+                    if (audioContext.state === 'running') {
+                        playSound();
+                    } else {
+                        console.error('Audio context not running after resume');
+                    }
                 }).catch(err => {
                     console.error('Error resuming audio context:', err);
-                    // Try to play anyway
-                    try {
-                        playSound();
-                    } catch (e) {
-                        console.error('Failed to play chime:', e);
-                    }
                 });
-            } else {
+            } else if (audioContext.state === 'running') {
                 playSound();
+            } else {
+                console.error('Audio context in unexpected state:', audioContext.state);
             }
         }
 
@@ -485,19 +494,32 @@
             initAudio();
             // Resume context if suspended - this is critical for autoplay policies
             if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume().catch(err => {
+                return audioContext.resume().catch(err => {
                     console.error('Error unlocking audio context:', err);
                 });
             }
+            return Promise.resolve();
         }
 
-        document.getElementById('startButton').addEventListener('click', (e) => {
-            // Unlock audio context FIRST, then start timer
-            unlockAudio();
-            // Small delay to ensure context is ready
-            setTimeout(() => {
-                startTimer();
-            }, 50);
+        document.getElementById('startButton').addEventListener('click', async (e) => {
+            // Unlock audio context FIRST and wait for it to be ready
+            await unlockAudio();
+            
+            // Create a test sound to ensure context is fully unlocked (silent, just to activate)
+            try {
+                const testOsc = audioContext.createOscillator();
+                const testGain = audioContext.createGain();
+                testGain.gain.value = 0; // Silent
+                testOsc.connect(testGain);
+                testGain.connect(audioContext.destination);
+                testOsc.start();
+                testOsc.stop(audioContext.currentTime + 0.001);
+            } catch (err) {
+                console.error('Error creating test sound:', err);
+            }
+            
+            // Now start timer
+            startTimer();
         });
         document.getElementById('addBtn').addEventListener('click', addSegment);
         document.getElementById('removeBtn').addEventListener('click', removeSegment);
