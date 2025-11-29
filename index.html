@@ -317,18 +317,25 @@
         }
 
         function playChime() {
+            console.log('🔔 playChime called');
+            
             // Ensure audio context exists
             if (!audioContext) {
+                console.log('Creating new audio context');
                 initAudio();
             }
+            
+            console.log('Audio context state:', audioContext.state);
             
             // Always try to resume if suspended (required for autoplay policies on HTTPS)
             const playSound = () => {
                 // Double-check context is ready
                 if (!audioContext || audioContext.state === 'closed') {
-                    console.error('Audio context not available');
+                    console.error('❌ Audio context not available or closed');
                     return;
                 }
+                
+                console.log('Playing chime sound, context state:', audioContext.state);
                 
                 try {
                     const oscillator = audioContext.createOscillator();
@@ -348,27 +355,31 @@
                     
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + duration);
+                    
+                    console.log('✅ Chime started successfully');
                 } catch (err) {
-                    console.error('Error playing chime:', err);
+                    console.error('❌ Error playing chime:', err);
                 }
             };
             
             // Resume context if suspended, then play
             if (audioContext.state === 'suspended') {
+                console.log('Audio context suspended, resuming...');
                 audioContext.resume().then(() => {
+                    console.log('Audio context resumed, state:', audioContext.state);
                     // Verify it's actually running
                     if (audioContext.state === 'running') {
                         playSound();
                     } else {
-                        console.error('Audio context not running after resume');
+                        console.error('❌ Audio context not running after resume, state:', audioContext.state);
                     }
                 }).catch(err => {
-                    console.error('Error resuming audio context:', err);
+                    console.error('❌ Error resuming audio context:', err);
                 });
             } else if (audioContext.state === 'running') {
                 playSound();
             } else {
-                console.error('Audio context in unexpected state:', audioContext.state);
+                console.error('❌ Audio context in unexpected state:', audioContext.state);
             }
         }
 
