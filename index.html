@@ -309,7 +309,6 @@
         let timeRemaining = 0;
         let timerInterval = null;
         let audioContext = null;
-        let chimeAudioContext = null; // Separate audio context for chime only
 
         function initAudio() {
             if (!audioContext) {
@@ -317,89 +316,16 @@
             }
         }
 
-        // Initialize chime audio context - separate and isolated
-        function initChimeAudio() {
-            if (!chimeAudioContext) {
-                chimeAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
-            // Keep context active - resume if suspended
-            if (chimeAudioContext.state === 'suspended') {
-                chimeAudioContext.resume().catch(err => {
-                    console.error('Error resuming chime audio context:', err);
-                });
-            }
-        }
+        // Create HTML5 Audio element for chime (more reliable than Web Audio API)
+        const chimeAudio = new Audio('Audio/chime.wav');
+        chimeAudio.preload = 'auto';
+        chimeAudio.volume = 1.0;
 
         function playChime() {
-            // Use dedicated chime audio context (completely separate from background audio)
-            initChimeAudio();
-            
-            // Always resume context first - browsers on HTTPS can suspend it
-            const ensureContextReady = () => {
-                return new Promise((resolve) => {
-                    if (!chimeAudioContext || chimeAudioContext.state === 'closed') {
-                        // Recreate if closed
-                        chimeAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    }
-                    
-                    if (chimeAudioContext.state === 'running') {
-                        resolve();
-                    } else if (chimeAudioContext.state === 'suspended') {
-                        chimeAudioContext.resume().then(resolve).catch(() => {
-                            // If resume fails, try creating new context
-                            chimeAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                            resolve();
-                        });
-                    } else {
-                        resolve();
-                    }
-                });
-            };
-            
-            // Always try to resume if suspended (required for autoplay policies on HTTPS)
-            const playSound = () => {
-                // Double-check context is ready
-                if (!chimeAudioContext || chimeAudioContext.state === 'closed') {
-                    console.error('Chime audio context not available or closed');
-                    return;
-                }
-                
-                try {
-                    const oscillator = chimeAudioContext.createOscillator();
-                    const gainNode = chimeAudioContext.createGain();
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(chimeAudioContext.destination);
-                    
-                    oscillator.frequency.value = 432;
-                    oscillator.type = 'sine';
-                    
-                    const duration = 5; // 5 second duration
-                    
-                    // Bell-like decay: start at 30% volume and fade to silence
-                    gainNode.gain.setValueAtTime(0.3, chimeAudioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.0001, chimeAudioContext.currentTime + duration);
-                    
-                    oscillator.start(chimeAudioContext.currentTime);
-                    oscillator.stop(chimeAudioContext.currentTime + duration);
-                } catch (err) {
-                    console.error('Error playing chime:', err);
-                }
-            };
-            
-            // Always ensure context is ready, then play
-            ensureContextReady().then(() => {
-                if (chimeAudioContext && chimeAudioContext.state === 'running') {
-                    playSound();
-                } else {
-                    // Last resort: try to play anyway
-                    try {
-                        playSound();
-                    } catch (err) {
-                        console.error('Failed to play chime after all attempts:', err);
-                    }
-                }
+            // Reset to beginning and play - HTML5 Audio is much more reliable
+            chimeAudio.currentTime = 0;
+            chimeAudio.play().catch(err => {
+                console.error('Error playing chime:', err);
             });
         }
 
@@ -536,26 +462,8 @@
             // Unlock audio context FIRST and wait for it to be ready
             await unlockAudio();
             
-            // Initialize and activate chime audio context separately
-            initChimeAudio();
-            if (chimeAudioContext && chimeAudioContext.state === 'suspended') {
-                await chimeAudioContext.resume();
-            }
-            
-            // Create a test sound to ensure chime context is fully unlocked (silent, just to activate)
-            try {
-                if (chimeAudioContext && chimeAudioContext.state !== 'closed') {
-                    const testOsc = chimeAudioContext.createOscillator();
-                    const testGain = chimeAudioContext.createGain();
-                    testGain.gain.value = 0; // Silent
-                    testOsc.connect(testGain);
-                    testGain.connect(chimeAudioContext.destination);
-                    testOsc.start();
-                    testOsc.stop(chimeAudioContext.currentTime + 0.001);
-                }
-            } catch (err) {
-                console.error('Error creating chime test sound:', err);
-            }
+            // Pre-load chime audio on first user interaction (ensures it's ready)
+            chimeAudio.load();
             
             // Also activate background audio context
             try {
@@ -579,13 +487,6 @@
             
             // Now start timer
             startTimer();
-        });
-        
-        // Keep chime context active when page becomes visible (prevents suspension)
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && chimeAudioContext && chimeAudioContext.state === 'suspended') {
-                chimeAudioContext.resume();
-            }
         });
         document.getElementById('addBtn').addEventListener('click', addSegment);
         document.getElementById('removeBtn').addEventListener('click', removeSegment);
