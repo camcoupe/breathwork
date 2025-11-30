@@ -354,19 +354,50 @@
                 duration: chimeAudio.duration
             });
             
-            // Pause and reset to beginning, then play - ensures clean playback every time
+            // Force a complete reset - pause, reset time, and load to ensure clean state
             chimeAudio.pause();
             chimeAudio.currentTime = 0;
             
-            const playPromise = chimeAudio.play();
+            // If audio thinks it's playing but isn't, force a load() to reset state
+            if (!chimeAudio.paused && chimeAudio.currentTime === 0) {
+                console.log('  - ⚠️ Audio in weird state (paused: false but at 0), forcing reload...');
+                chimeAudio.load(); // This resets the entire audio element
+            }
+            
+            // Small delay to ensure load() completes if it was called
+            const playPromise = new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    chimeAudio.play().then(resolve).catch(reject);
+                }, 50);
+            });
+            
             console.log('  - play() called, promise:', playPromise);
             
             return playPromise.then(() => {
                 console.log('  - ✅ play() promise resolved - chime should be playing');
-                console.log('  - Audio state after play:', {
-                    paused: chimeAudio.paused,
-                    currentTime: chimeAudio.currentTime
-                });
+                
+                // Check if audio is actually playing after a brief moment
+                setTimeout(() => {
+                    const isActuallyPlaying = !chimeAudio.paused && chimeAudio.currentTime > 0;
+                    console.log('  - Audio state after play (100ms later):', {
+                        paused: chimeAudio.paused,
+                        currentTime: chimeAudio.currentTime,
+                        actuallyPlaying: isActuallyPlaying,
+                        readyState: chimeAudio.readyState
+                    });
+                    
+                    if (!isActuallyPlaying) {
+                        console.warn('  - ⚠️ WARNING: Promise resolved but audio is NOT actually playing!');
+                        console.warn('  - Attempting to force play again...');
+                        // Try playing again with a fresh load
+                        chimeAudio.load();
+                        setTimeout(() => {
+                            chimeAudio.play().catch(err => {
+                                console.error('  - ❌ Second play attempt also failed:', err);
+                            });
+                        }, 50);
+                    }
+                }, 100);
             }).catch(err => {
                 console.error('  - ❌ Error playing chime:', err);
                 console.log('  - Audio state on error:', {
@@ -601,6 +632,13 @@
                 currentTime: chimeAudio.currentTime,
                 readyState: chimeAudio.readyState
             });
+            
+            // If chime is still playing from previous run, stop it completely first
+            if (!chimeAudio.paused) {
+                console.log('  - Chime was still playing, stopping it first...');
+                chimeAudio.pause();
+                chimeAudio.currentTime = 0;
+            }
             
             chimeAudio.volume = 0; // Silent
             chimeAudio.currentTime = 0;
