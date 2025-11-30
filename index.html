@@ -322,7 +322,8 @@
         chimeAudio.volume = 1.0;
 
         function playChime() {
-            // Reset to beginning and play - HTML5 Audio is much more reliable
+            // Pause and reset to beginning, then play - ensures clean playback every time
+            chimeAudio.pause();
             chimeAudio.currentTime = 0;
             chimeAudio.play().catch(err => {
                 console.error('Error playing chime:', err);
@@ -385,7 +386,10 @@
                         timeRemaining = intervals[currentSection];
                     } else {
                         clearInterval(timerInterval);
-                        stopTimer();
+                        // Small delay before stopping to ensure chime starts playing
+                        setTimeout(() => {
+                            stopTimer();
+                        }, 100);
                     }
                 }
             }, 1000);
