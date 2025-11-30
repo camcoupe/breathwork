@@ -234,6 +234,11 @@
             display: flex;
         }
 
+        .timer-display.fading {
+            opacity: 0;
+            transition: opacity 0.8s ease-out;
+        }
+
         .time {
             font-size: 84px;
             font-weight: normal;
@@ -385,15 +390,21 @@
                         playChime();
                         timeRemaining = intervals[currentSection];
                     } else {
+                        // Last segment: play chime, hold at 00:00 for 2 seconds, then fade out
                         clearInterval(timerInterval);
-                        // On last segment: wait for chime to actually start playing, then stop timer
-                        // This ensures audio is playing before page state changes, but minimizes visual delay
-                        playChime().then(() => {
-                            stopTimer();
-                        }).catch(() => {
-                            // If play fails, stop timer anyway
-                            stopTimer();
-                        });
+                        playChime();
+                        
+                        // Hold at 00:00 for 2 seconds to let chime play
+                        setTimeout(() => {
+                            // Fade out the timer display
+                            const timerDisplay = document.getElementById('timerDisplay');
+                            timerDisplay.classList.add('fading');
+                            
+                            // After fade completes, return to home
+                            setTimeout(() => {
+                                stopTimer();
+                            }, 800); // Match the fade duration
+                        }, 2000); // 2 second hold at 00:00
                     }
                 }
             }, 1000);
@@ -405,7 +416,8 @@
             clearInterval(timerInterval);
             currentSection = 0;
             timeRemaining = 0;
-            document.getElementById('timerDisplay').classList.remove('active');
+            const timerDisplay = document.getElementById('timerDisplay');
+            timerDisplay.classList.remove('active', 'fading');
             document.getElementById('mainContainer').style.display = 'flex';
         }
 
