@@ -346,11 +346,34 @@
         });
 
         function playChime() {
+            console.log('🔔 playChime() called');
+            console.log('  - Audio state before:', {
+                paused: chimeAudio.paused,
+                currentTime: chimeAudio.currentTime,
+                readyState: chimeAudio.readyState,
+                duration: chimeAudio.duration
+            });
+            
             // Pause and reset to beginning, then play - ensures clean playback every time
             chimeAudio.pause();
             chimeAudio.currentTime = 0;
-            return chimeAudio.play().catch(err => {
-                console.error('Error playing chime:', err);
+            
+            const playPromise = chimeAudio.play();
+            console.log('  - play() called, promise:', playPromise);
+            
+            return playPromise.then(() => {
+                console.log('  - ✅ play() promise resolved - chime should be playing');
+                console.log('  - Audio state after play:', {
+                    paused: chimeAudio.paused,
+                    currentTime: chimeAudio.currentTime
+                });
+            }).catch(err => {
+                console.error('  - ❌ Error playing chime:', err);
+                console.log('  - Audio state on error:', {
+                    paused: chimeAudio.paused,
+                    currentTime: chimeAudio.currentTime,
+                    readyState: chimeAudio.readyState
+                });
             });
         }
 
@@ -434,14 +457,22 @@
                 
                 if (remaining <= 0) {
                     // Section complete
+                    console.log('⏱️ Timer section complete:', {
+                        currentSection,
+                        totalSections: intervals.length,
+                        isLast: currentSection >= intervals.length - 1
+                    });
+                    
                     currentSection++;
                     
                     if (currentSection < intervals.length) {
+                        console.log('  - Moving to next section');
                         playChime();
                         timeRemaining = intervals[currentSection];
                         timerStartTime = Date.now(); // Reset start time for next section
                     } else {
                         // Last segment: play chime, hold at 00:00 for 2 seconds, then fade out
+                        console.log('  - Last section - triggering chime');
                         if (timerAnimationFrame) {
                             cancelAnimationFrame(timerAnimationFrame);
                             timerAnimationFrame = null;
@@ -557,11 +588,20 @@
         }
 
         document.getElementById('startButton').addEventListener('click', async (e) => {
+            console.log('▶️ Start button clicked');
+            
             // Unlock audio context FIRST and wait for it to be ready
             await unlockAudio();
             
             // Pre-authorize chime by playing it silently and immediately pausing
             // This ensures it can play later even if user switches tabs
+            console.log('  - Pre-authorizing chime...');
+            console.log('  - Chime state before pre-auth:', {
+                paused: chimeAudio.paused,
+                currentTime: chimeAudio.currentTime,
+                readyState: chimeAudio.readyState
+            });
+            
             chimeAudio.volume = 0; // Silent
             chimeAudio.currentTime = 0;
             try {
@@ -569,9 +609,10 @@
                 chimeAudio.pause();
                 chimeAudio.currentTime = 0;
                 chimeAudio.volume = 1.0; // Restore volume
+                console.log('  - ✅ Chime pre-authorized successfully');
             } catch (err) {
                 chimeAudio.volume = 1.0; // Restore volume even if play fails
-                console.error('Error pre-authorizing chime:', err);
+                console.error('  - ❌ Error pre-authorizing chime:', err);
             }
             
             // Also activate background audio context
