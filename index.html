@@ -494,27 +494,44 @@
                         isLast: currentSection >= intervals.length - 1
                     });
                     
+                    // Stop the update loop temporarily
+                    if (timerAnimationFrame) {
+                        cancelAnimationFrame(timerAnimationFrame);
+                        timerAnimationFrame = null;
+                    }
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    
+                    // Ensure display shows 00:00
+                    document.getElementById('timeDisplay').textContent = '00:00';
+                    
                     currentSection++;
                     
                     if (currentSection < intervals.length) {
                         console.log('  - Moving to next section');
                         playChime();
-                        timeRemaining = intervals[currentSection];
-                        timerStartTime = Date.now(); // Reset start time for next section
+                        
+                        // Hold at 00:00 for 1 second before moving to next section
+                        setTimeout(() => {
+                            timeRemaining = intervals[currentSection];
+                            timerStartTime = Date.now(); // Reset start time for next section
+                            
+                            // Resume the update loop
+                            updateTimer();
+                            timerAnimationFrame = requestAnimationFrame(updateTimer);
+                            timerInterval = setInterval(() => {
+                                updateTimer();
+                            }, 1000);
+                        }, 1000); // 1 second hold at 00:00
+                        return; // Stop updating for now
                     } else {
                         // Last segment: play chime, hold at 00:00 for 2 seconds, then fade out
                         console.log('  - Last section - triggering chime');
-                        if (timerAnimationFrame) {
-                            cancelAnimationFrame(timerAnimationFrame);
-                            timerAnimationFrame = null;
-                        }
-                        if (timerInterval) {
-                            clearInterval(timerInterval);
-                            timerInterval = null;
-                        }
                         playChime();
                         
-                        // Hold at 00:00 for 2 seconds to let chime play
+                        // Hold at 00:00 for 3 seconds to let chime play
                         setTimeout(() => {
                             // Fade out the timer display
                             const timerDisplay = document.getElementById('timerDisplay');
@@ -524,7 +541,7 @@
                             setTimeout(() => {
                                 stopTimer();
                             }, 800); // Match the fade duration
-                        }, 2000); // 2 second hold at 00:00
+                        }, 3000); // 3 second hold at 00:00
                         return; // Stop updating
                     }
                 }
