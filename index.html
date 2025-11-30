@@ -326,6 +326,23 @@
         chimeAudio.preload = 'auto';
         chimeAudio.volume = 1.0;
 
+        // Re-authorize chime when tab becomes active again (browsers revoke authorization on tab switch)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && timerInterval) {
+                // Timer is running, re-authorize chime so it can play when timer ends
+                // Play silently for a moment to re-authorize
+                chimeAudio.volume = 0; // Silent
+                chimeAudio.currentTime = 0;
+                chimeAudio.play().then(() => {
+                    chimeAudio.pause();
+                    chimeAudio.currentTime = 0;
+                    chimeAudio.volume = 1.0; // Restore volume
+                }).catch(() => {
+                    chimeAudio.volume = 1.0; // Restore volume even if play fails
+                });
+            }
+        });
+
         function playChime() {
             // Pause and reset to beginning, then play - ensures clean playback every time
             chimeAudio.pause();
@@ -482,8 +499,19 @@
             // Unlock audio context FIRST and wait for it to be ready
             await unlockAudio();
             
-            // Pre-load chime audio on first user interaction (ensures it's ready)
-            chimeAudio.load();
+            // Pre-authorize chime by playing it silently and immediately pausing
+            // This ensures it can play later even if user switches tabs
+            chimeAudio.volume = 0; // Silent
+            chimeAudio.currentTime = 0;
+            try {
+                await chimeAudio.play();
+                chimeAudio.pause();
+                chimeAudio.currentTime = 0;
+                chimeAudio.volume = 1.0; // Restore volume
+            } catch (err) {
+                chimeAudio.volume = 1.0; // Restore volume even if play fails
+                console.error('Error pre-authorizing chime:', err);
+            }
             
             // Also activate background audio context
             try {
