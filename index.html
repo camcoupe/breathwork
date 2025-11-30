@@ -492,6 +492,11 @@
                 }
                 
                 if (remaining <= 0) {
+                    // Prevent multiple triggers - if timer is already stopped, don't process again
+                    if (!timerStartTime || timerInterval === null) {
+                        return; // Already processing completion
+                    }
+                    
                     // Section complete
                     console.log('⏱️ Timer section complete:', {
                         currentSection,
@@ -506,13 +511,21 @@
                     }
                     if (timerInterval) {
                         clearInterval(timerInterval);
-                        timerInterval = null;
+                        timerInterval = null; // Set to null to mark as stopped
                     }
                     
                     // Ensure display shows 00:00
                     document.getElementById('timeDisplay').textContent = '00:00';
                     
-                    currentSection++;
+                    // Only increment if we haven't already gone past the last section
+                    if (currentSection < intervals.length) {
+                        currentSection++;
+                    } else {
+                        // Already past last section, something went wrong
+                        console.error('currentSection already beyond bounds:', currentSection, 'intervals:', intervals.length);
+                        stopTimer();
+                        return;
+                    }
                     
                     if (currentSection < intervals.length) {
                         console.log('  - Moving to next section');
