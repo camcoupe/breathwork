@@ -483,8 +483,13 @@
                 const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
                 const remaining = Math.max(0, timeRemaining - elapsed);
                 
-                // Update display with calculated remaining time
-                document.getElementById('timeDisplay').textContent = formatTime(remaining);
+                // Update display with calculated remaining time (ensure it's a valid number)
+                if (isNaN(remaining) || !isFinite(remaining)) {
+                    console.error('Invalid remaining time:', remaining, 'timeRemaining:', timeRemaining, 'elapsed:', elapsed);
+                    document.getElementById('timeDisplay').textContent = '00:00';
+                } else {
+                    document.getElementById('timeDisplay').textContent = formatTime(remaining);
+                }
                 
                 if (remaining <= 0) {
                     // Section complete
@@ -515,15 +520,24 @@
                         
                         // Hold at 00:00 for 1 second before moving to next section
                         setTimeout(() => {
-                            timeRemaining = intervals[currentSection];
-                            timerStartTime = Date.now(); // Reset start time for next section
-                            
-                            // Resume the update loop
-                            updateTimer();
-                            timerAnimationFrame = requestAnimationFrame(updateTimer);
-                            timerInterval = setInterval(() => {
+                            // Ensure we have a valid interval value
+                            if (currentSection < intervals.length && intervals[currentSection] !== undefined && !isNaN(intervals[currentSection])) {
+                                timeRemaining = intervals[currentSection];
+                                timerStartTime = Date.now(); // Reset start time for next section
+                                
+                                // Update display immediately with the new time
+                                document.getElementById('timeDisplay').textContent = formatTime(timeRemaining);
+                                
+                                // Resume the update loop
                                 updateTimer();
-                            }, 1000);
+                                timerAnimationFrame = requestAnimationFrame(updateTimer);
+                                timerInterval = setInterval(() => {
+                                    updateTimer();
+                                }, 1000);
+                            } else {
+                                console.error('Invalid interval at section:', currentSection, 'intervals:', intervals);
+                                stopTimer();
+                            }
                         }, 1000); // 1 second hold at 00:00
                         return; // Stop updating for now
                     } else {
