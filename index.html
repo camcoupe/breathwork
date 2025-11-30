@@ -361,6 +361,28 @@
         }
 
         function parseTimeSegment(value) {
+            // Support formats:
+            // - ".10" = 10 seconds (no minutes, just seconds)
+            // - ".05" = 5 seconds
+            // - "1.15" = 1 minute 15 seconds
+            // - "3" or "3 min" = 3 minutes
+            
+            // Check for format starting with dot (just seconds)
+            const secondsOnlyMatch = value.match(/^\.(\d+)$/);
+            if (secondsOnlyMatch) {
+                const seconds = parseInt(secondsOnlyMatch[1], 10);
+                return seconds / 60; // Convert seconds to minutes
+            }
+            
+            // Check for minutes.seconds format
+            const minutesSecondsMatch = value.match(/^(\d+)\.(\d+)$/);
+            if (minutesSecondsMatch) {
+                const minutes = parseInt(minutesSecondsMatch[1], 10);
+                const seconds = parseInt(minutesSecondsMatch[2], 10);
+                return minutes + (seconds / 60); // Total minutes
+            }
+            
+            // Fallback to original format (just minutes)
             const match = value.match(/(\d+(?:\.\d+)?)\s*(?:min|m|minutes?)?/i);
             if (match) {
                 return parseFloat(match[1]);
