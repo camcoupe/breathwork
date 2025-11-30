@@ -325,7 +325,7 @@
             // Pause and reset to beginning, then play - ensures clean playback every time
             chimeAudio.pause();
             chimeAudio.currentTime = 0;
-            chimeAudio.play().catch(err => {
+            return chimeAudio.play().catch(err => {
                 console.error('Error playing chime:', err);
             });
         }
@@ -379,17 +379,21 @@
                 updateTimeDisplay();
                 
                 if (timeRemaining <= 0) {
-                    playChime();
                     currentSection++;
                     
                     if (currentSection < intervals.length) {
+                        playChime();
                         timeRemaining = intervals[currentSection];
                     } else {
                         clearInterval(timerInterval);
-                        // Small delay before stopping to ensure chime starts playing
-                        setTimeout(() => {
+                        // On last segment: wait for chime to actually start playing, then stop timer
+                        // This ensures audio is playing before page state changes, but minimizes visual delay
+                        playChime().then(() => {
                             stopTimer();
-                        }, 100);
+                        }).catch(() => {
+                            // If play fails, stop timer anyway
+                            stopTimer();
+                        });
                     }
                 }
             }, 1000);
