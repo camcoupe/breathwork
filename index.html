@@ -96,6 +96,22 @@
             justify-content: center;
         }
 
+        .start-button.fade-in {
+            opacity: 0;
+            animation: fadeInElement 0.8s ease-in forwards;
+        }
+
+
+
+        @keyframes fadeInElement {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
         .start-button {
             background: #000;
             color: white;
@@ -105,11 +121,12 @@
             font-size: 16px;
             font-weight: normal;
             cursor: pointer;
-            transition: all 0.2s ease;
+            /* No default transition - only add when needed for fade-in */
             position: absolute;
             bottom: 36px;
             left: 50%;
             transform: translateX(-50%);
+            transition: transform 0.2s ease; /* Only transition transform for hover effect */
         }
 
         .start-button:hover {
@@ -239,6 +256,15 @@
             transition: opacity 0.8s ease-out;
         }
 
+        .container {
+            opacity: 0;
+            transition: opacity 0.8s ease-in;
+        }
+
+        .container.fade-in {
+            opacity: 1;
+        }
+
         .time {
             font-size: 84px;
             font-weight: normal;
@@ -276,7 +302,7 @@
             <div class="hue-indicator" id="hueIndicator"></div>
         </div>
     </div>
-    <div class="container" id="mainContainer">
+    <div class="container fade-in" id="mainContainer">
         <button class="start-button" id="startButton">Start</button>
         <div class="toolbar-wrapper">
             <div class="toolbar" id="toolbar">
@@ -473,7 +499,13 @@
             timerStartTime = Date.now(); // Record start time
             
             document.getElementById('timerDisplay').classList.add('active');
-            document.getElementById('mainContainer').style.display = 'none';
+            const mainContainer = document.getElementById('mainContainer');
+            mainContainer.style.display = 'none';
+            // Remove fade-in classes from child elements
+            const startButton = document.querySelector('.start-button');
+            const toolbarWrapper = document.querySelector('.toolbar-wrapper');
+            if (startButton) startButton.classList.remove('fade-in');
+            if (toolbarWrapper) toolbarWrapper.classList.remove('fade-in');
             
             // Use time-based approach instead of setInterval for accuracy when tab is inactive
             function updateTimer() {
@@ -564,9 +596,9 @@
                             const timerDisplay = document.getElementById('timerDisplay');
                             timerDisplay.classList.add('fading');
                             
-                            // After fade completes, return to home
+                            // After fade completes, return to home with fade-in
                             setTimeout(() => {
-                                stopTimer();
+                                stopTimer(true); // true = fade in
                             }, 800); // Match the fade duration
                         }, 3000); // 3 second hold at 00:00
                         return; // Stop updating
@@ -588,7 +620,7 @@
             updateTimeDisplay();
         }
 
-        function stopTimer() {
+        function stopTimer(shouldFade = false) {
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -602,10 +634,72 @@
             timeRemaining = 0;
             const timerDisplay = document.getElementById('timerDisplay');
             timerDisplay.classList.remove('active', 'fading');
-            document.getElementById('mainContainer').style.display = 'flex';
+            
+            const startButton = document.querySelector('.start-button');
+            const toolbarWrapper = document.querySelector('.toolbar-wrapper');
+            
+            if (shouldFade) {
+                const mainContainer = document.getElementById('mainContainer');
+                mainContainer.style.display = 'flex';
+                // Fade in when timer completes naturally
+                // Only animate start button - toolbar appears immediately (it has its own background opacity)
+                if (startButton) {
+                    startButton.style.opacity = '0';
+                    startButton.classList.remove('fade-in');
+                }
+                // Toolbar appears immediately - no opacity animation
+                if (toolbarWrapper) {
+                    toolbarWrapper.style.opacity = '';
+                    toolbarWrapper.classList.remove('fade-in');
+                }
+                
+                setTimeout(() => {
+                    // Trigger fade-in animation for start button only
+                    if (startButton) {
+                        startButton.classList.add('fade-in');
+                    }
+                    // Remove class after animation completes
+                    setTimeout(() => {
+                        if (startButton) {
+                            startButton.classList.remove('fade-in');
+                            startButton.style.opacity = '';
+                        }
+                    }, 800); // Match animation duration
+                }, 10); // Small delay to ensure display is set first
+            } else {
+                // Show immediately when stop button is clicked
+                const mainContainer = document.getElementById('mainContainer');
+                mainContainer.style.display = 'flex';
+            }
+        }
+
+        function updateButtonVisibility() {
+            const segments = document.querySelectorAll('.time-segment');
+            const addBtn = document.getElementById('addBtn');
+            const removeBtn = document.getElementById('removeBtn');
+            
+            // Hide + button when at maximum (5 segments)
+            if (segments.length >= 5) {
+                addBtn.style.display = 'none';
+            } else {
+                addBtn.style.display = 'flex';
+            }
+            
+            // Hide - button when at minimum (1 segment)
+            if (segments.length <= 1) {
+                removeBtn.style.display = 'none';
+            } else {
+                removeBtn.style.display = 'flex';
+            }
         }
 
         function addSegment() {
+            const segments = document.querySelectorAll('.time-segment');
+            // Maximum of 5 segments
+            if (segments.length >= 5) {
+                return;
+            }
+            
             const toolbar = document.getElementById('toolbar');
             const newSegment = document.createElement('input');
             newSegment.type = 'text';
@@ -618,12 +712,14 @@
                 setTimeout(() => this.select(), 0);
             });
             toolbar.appendChild(newSegment);
+            updateButtonVisibility();
         }
 
         function removeSegment() {
             const segments = document.querySelectorAll('.time-segment');
             if (segments.length > 1) {
                 segments[segments.length - 1].remove();
+                updateButtonVisibility();
             } else {
                 alert('You need at least one timer segment');
             }
@@ -723,6 +819,9 @@
         document.getElementById('addBtn').addEventListener('click', addSegment);
         document.getElementById('removeBtn').addEventListener('click', removeSegment);
         document.getElementById('stopBtn').addEventListener('click', stopTimer);
+        
+        // Initialize button visibility on page load
+        updateButtonVisibility();
 
         // Radial hue menu control
         const hueControl = document.getElementById('hueControl');
